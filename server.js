@@ -22,7 +22,11 @@ async function sendTelegram(text) {
 }
 
 function cleanPhone(deviceId) {
-  return (deviceId || "").replace("c.us", "").trim();
+  return (deviceId || "")
+    .replace("@c.us", "")
+    .replace("c.us", "")
+    .replace("@", "")
+    .trim();
 }
 
 app.post("/webhook", async (req, res) => {
@@ -75,26 +79,35 @@ Contato: "${telefone}"`
     });
 
     const data = await respostaGPT.json();
-    const text = data.output?.[0]?.content?.[0]?.text || "{}";
+
+const text =
+  (typeof data.output_text === "string" && data.output_text.trim()) ||
+  data.output?.[0]?.content?.[0]?.text ||
+  data.output?.[0]?.content?.[0]?.value ||
+  "{}";
+
 
     let card;
+try {
+  card = JSON.parse(text);
+} catch {
+  card = {};
+}
 
-    try {
-      card = JSON.parse(text);
-    } catch {
-      card = {
-        classificacao: "MORNO",
-        intencao: "indefinida",
-        respostas: {
-          curta: "Perfeito! Você está buscando pra morar ou investir?",
-          padrao: "Perfeito! Pra eu te ajudar melhor: você busca pra morar ou investir?",
-          cta: "Posso te sugerir dois horários de visita. Você prefere sábado ou domingo?"
-        },
-        pergunta_unica: "Você busca pra morar ou investir?",
-        proximo_passo: "Fazer 1 pergunta estratégica",
-        alertas: ["Erro ao interpretar resposta do modelo"]
-      };
-    }
+if (!card.classificacao || !card.respostas) {
+  card = {
+    classificacao: "MORNO",
+    intencao: "primeiro contato / qualificar",
+    respostas: {
+      curta: "Oi! Tudo bem? Você está buscando uma casa pra morar ou investir?",
+      padrao: "Oi! Tudo bem? Pra eu te ajudar melhor, você busca pra morar ou investir? E qual região/condomínio te atende melhor?",
+      cta: "Perfeito. Se fizer sentido, posso te sugerir 2 horários de visita no fim de semana. Prefere sábado ou domingo?"
+    },
+    pergunta_unica: "Você busca pra morar ou investir?",
+    proximo_passo: "Fazer 1 pergunta e sugerir visita",
+    alertas: []
+  };
+}
 
     const mensagemTelegram = 
 `📩 Copiloto - Nova mensagem
